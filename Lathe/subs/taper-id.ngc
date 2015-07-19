@@ -1,0 +1,45 @@
+(info: Taper ID, multi-pass)
+o<taper-id> sub
+#<diameter> = #1 (= 8.0 Hole diam)
+#<final-depth> = #2 (= 2.0 Taper Depth)
+#<doc> = #3 (= 0.125 Depth of Cut)
+#<angle> = #4 (= 45 Angle of Taper)
+#<z-start> = #5 (= 0.000 Z Start)
+#<feed> = #6 (= 20 Feed Rate)
+#<tool> = #7 (= 2 Tool Number)
+#<max-rpm> = #8 (= 500 Max RPM)
+#<sfm> = #9 (= 30 SMM)
+#<coolant> = #10 (= 8 Flood=8, Off=9)
+
+G7  (diameter mode)
+G18 (xy plane)
+G21 (mm)
+G40 (cancel cutter radius compensation)
+G54 (coordinant system 1 default)
+F#<feed>
+G96 D#<max-rpm> S#<sfm>
+T#<tool> M6 G43
+G42 (start cutter comp)
+M3 M#<coolant>
+#<current-depth> = 0
+o100 while [#<current-depth> LT #<final-depth>]
+o110 if [[#<current-depth> + #<doc>]LT #<final-depth>]
+#<current-depth> = [#<current-depth> + #<doc>]
+o110 else
+#<current-depth> = #<final-depth>
+o110 endif
+#<current-x> = [#<diameter> + [#<current-depth> * 2]]
+G0 X#<current-x> Z[#<z-start> + .20]
+G1 Z[#<z-start>]
+;G1 X#<diameter> Z[#<z-start> + [#<current-depth> * TAN[90 - #<angle>]]]
+G1 X#<diameter> Z[#<z-start> + [#<current-depth> * TAN[90 + #<angle>]]]
+G1 X[#<diameter> - 0.2]
+G0 Z[#<z-start> + .2]
+o100 endwhile
+
+M5 M9
+G0 Z[#<z-start> + .1]
+G40 G97
+;G53 G0 X0.000 Z0.000
+
+o<taper-id> endsub

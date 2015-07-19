@@ -1,0 +1,94 @@
+( Lathe inside diameter taper 11/14/2012)
+
+( UNTESTED CONCEPT ONLY, EDIT AND TEST BEFORE USE)
+
+; tapers from Hole Diameter to Large Diameter
+; Large Diameter must be greater than Hole Diameter
+
+o<idtaper3>sub
+     #<Hole_Diam> =    #1 (=1.00 Hole Diameter) 
+     #<Large_Diam> =    #2 (=1.50 Large Diameter) 
+     #<Max_Cut> =       #3 (=0.200 Max Depth of Cut)
+     #<Start_z> =       #4 (=0.00 Z Start of Cut)
+     #<End_z> =         #5 (=-0.750 Z End of Cut)
+     #<Feed> =          #6 (=40 Feed mmPM)
+     #<Final_Cut> =	#7 (=.100 Final Cut)
+     #<Fin_ Feed> = 	#8 (=40 Final cut speed)
+     #<Spring_Cuts> =   #9 (=0 Spring Cuts)
+
+o100 IF [#<Large_Diam> LE #<Hole_Diam>]
+	(MSG, Start Diameter must be less than Stock Diameter)
+ 	M2  
+o100 ENDIF 
+
+o101 IF [#<Final_Cut> LT 0]
+	(MSG, Final Cut cannont be less than 0)
+ 	M2  
+o101 ENDIF 
+
+
+G18 (xz plane)
+G21 (mm)
+G40 (cancel cutter radius compensation)
+G49 (cancel tool lengthoffset)
+G90 (absolute distance mode)
+G94 (units/min feedrate)
+G54 (Coordinant system 1 default)
+G7  (diameter mode)
+G64 P.0254 Q.0 254    
+T2 M6 G43 
+#<Work_Diam> = [#<Hole_Diam> - #<Final_Cut>]
+#<Start_Work_Diam> = [#<Large_Diam> - #<Final_Cut>]
+#<Z_Len> = [0 - [#<End_z> - #<Start_z>]] ; length of Z cut
+#<Cut_Amount> = [#<Start_Work_Diam> - #<Work_Diam>]
+#<Cuts> = FUP [[#<Cut_Amount> /  #<Max_Cut>]] ; round up the number of passes to reach deepest cut
+#<Max_Cut> = [#<Cut_Amount> / #<Cuts>] ; amount to take off X each pass
+#<Z_Cut> = [#<Z_Len> / #<Cuts>] ;length of each Z cut
+
+;;; Uncomment below to turn spindle on
+M3 s500 ; spindle cw
+
+G0 X[#<Work_Diam> - .250] Z#<Start_z>
+F#<Feed>
+G1 X#<Work_Diam> 
+
+#<Current-Diameter> = #<Work_Diam>
+#<Z_Target> = #<Start_z> 
+
+o102 while [#<Cuts> GT 0]
+	#<Current-Diameter> = [#<Current-Diameter> + #<Max_Cut>]  
+	#<Z_Target> = [#<Z_Target> - #<Z_Cut>]
+
+	G0 X [#<Current-Diameter> - .250]
+	G1 X #<Current-Diameter>  
+	G1 X #<Work_Diam> Z #<Z_Target>
+;	G0 X [#<Work_Diam> - .250]
+	G0 Z #<Start_z>
+
+	#<Cuts> = [#<Cuts> - 1]
+o102 endwhile
+
+; Finish cut  
+ F#<Fin_ Feed>
+ G0 X [#<Large_Diam> - .250]
+ G1 X  #<Large_Diam>
+ G1 X  #<Hole_Diam> Z #<End_z>
+ ;G0 X [ #<Hole_Diam> - .250]
+ G0 Z #<Start_z>
+
+; Spring cut
+F#<Fin_ Feed>
+o104 while [#<Spring_Cuts> gt 0]
+	G0 X [#<Large_Diam> - .250]
+	G1 X  #<Large_Diam>
+	G1 Z #<End_z> X  #<Hole_Diam>
+;	G0 X [#<Hole_Diam> - .250]
+	G0 Z #<Start_z>
+
+	#<Spring_Cuts> = [#<Spring_Cuts> -1]
+o104 endwhile
+
+M5             ; stop spindle
+G0 Z #<Start_z>
+
+o<idtaper3>endsub

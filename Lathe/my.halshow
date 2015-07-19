@@ -1,0 +1,1 @@
+pin+spindle-ramp.in pin+spindle-ramp.out pin+spindle-ramp.load pin+spindle-pid.output pin+spindle-pid.error pin+spindle-pid.feedback pin+hal_pru_generic.pwmgen pin+hal_pru_generic.pwmgen.00 pin+hal_pru_generic.pwmgen.00.out.00.value pin+hal_pru_generic.pwmgen.00.out.00.enable

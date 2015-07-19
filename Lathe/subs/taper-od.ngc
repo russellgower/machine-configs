@@ -1,0 +1,97 @@
+;odtaper_lathe3 for lathe
+;outside diam taper for end of shaft
+
+;UNTESTED concept only, edit and test for your own use before using
+
+;Before running make sure tool is in a position that it can safely travel to Stock Diameter and Z Start.
+
+o<taper-od>sub
+     #<Stock_Diam> =    #1 (=23.85252 Stock Diameter)
+     #<Small_Diam> =    #2 (=19.76112 Small Diameter)
+     #<Max_Cut> =       #3 (=0.25 Max Depth of Cut)
+     #<Start_z> =       #4 (=0 Z Start of Cut)
+     #<End_z> =         #5 (=-77.7875 Z End of Cut)
+     #<Feed> =          #6 (=20 Feed mm/Min)
+     #<RPM> =           #7 (=500 RPM)
+     #<Final_Cut> =     #8 (=.125 Final Cut)
+     #<Fin_ Feed> =     #9 (=10 Final cut speed)
+     #<Spring_Cuts> =   #10 (=0 Spring Cuts)
+
+#<Large_Diam_F> = #<Stock_Diam>
+#<Small_Diam_F> = #<Small_Diam>
+#<Stock_Diam> = [#<Stock_Diam> + #<Final_Cut>]
+#<Small_Diam> = [#<Small_Diam> + #<Final_Cut>]
+#<Z_Len> = [#<Start_z> - #<End_z>]
+#<Cut_Amount> = [#<Stock_Diam> - #<Small_Diam>] ; deepest X cut
+#<Cuts> = FUP [[#<Cut_Amount> /  #<Max_Cut>]] ; round up the number of passes to reach deepest cut
+#<Max_Cut> = [#<Cut_Amount> / #<Cuts>] ; amount to take off X each pass
+#<Z_Cut> = [#<Z_Len> / #<Cuts>] ;length of each Z cut
+
+G18 (xz plane)
+G21 (mm)
+G40 (cancel cutter radius compensation)
+G49 (cancel tool length offset)
+G90 (absolute distance mode)
+G94 (units/min feed rate)
+G54 (Coordinant system 1 default)
+G7  (diameter mode)
+G64 p.001 q.001 (set path tolerance)
+
+; if Z End of Cut is greater than Z Start of Cut do not run
+o201 if [#<End_z> gt #<Start_z>]
+(debug, Z End of Cut #<End_z># greater than Z Start of Cut #<Start_z>)
+o200 return
+o201 endif
+
+; if X Stock Diam is less than Small Diam do not run
+o301 if [#<Stock_Diam> lt #<Small_Diam>]
+(debug, Stock Diam #<Stock_Diam> less than  Small Diam #<Small_Diam>)
+o300 return
+o301 endif
+
+S#<RPM>
+F#<Feed>
+M3 ; spindle cw
+G4 P1 ; pause for spindle to reach RPM
+
+G0 X[#<Stock_Diam> + .250] Z[#<Start_z> +.250]
+G1 X#<Stock_Diam> 
+#<Current-Diameter> = #<Stock_Diam>
+#<Current-Z> = #<Start_z> 
+#<X_Target> = #<Stock_Diam>
+#<Z_Target> = #<Start_z> 
+
+o100 while [#<Cuts> gt 0]
+   #<Current-Diameter> = [#<Current-Diameter> - #<Max_Cut>]  
+   #<Z_Target> = [#<Z_Target> - #<Z_Cut>]
+   G0 X [#<Current-Diameter> + .250]
+   G1 X #<Current-Diameter> 
+   G1 Z #<Start_z> 
+   G1 X #<Stock_Diam> Z #<Z_Target>
+   G0 X [#<Stock_Diam> + .250]
+   G0 Z [#<Start_z> +.250]
+   #<Cuts> = [#<Cuts> - 1]
+o100 endwhile
+
+;final cut  
+F#<Fin_ Feed>
+G0 X [#<Current-Diameter> + .250]
+G1 X #<Small_Diam_F>
+G1 X #<Large_Diam_F> Z #<End_z>
+G0 X [#<Large_Diam_F> + .250]
+G0 Z #<Start_z>
+
+;spring cuts
+o102 while [#<Spring_Cuts> gt 0]
+   G0 X [#<Small_Diam_F> + .250]
+   G1 X #<Small_Diam_F>
+   G1 Z #<End_z> X #<Large_Diam_F>
+   G0 X [#<Large_Diam_F> + .250]
+   G0 Z #<Start_z>
+   #<Spring_Cuts> = [#<Spring_Cuts> -1]
+o102 endwhile
+
+M5 ; stop spindle
+G0 Z #<Start_z>
+
+o<taper-od>endsub

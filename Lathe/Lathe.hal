@@ -1,0 +1,236 @@
+# #######################################
+#
+# HAL file for BeagleBone + BeBoPr cape with 4 steppers
+#
+# Derived from example hm2-stepper config
+#
+# ########################################
+
+# Launch the setup script to make sure hardware setup looks good
+#loadusr -w ./setup.bridge.sh
+loadusr -w sudo ./setup
+
+# ###################################
+# Core EMC/HAL Loads
+# ###################################
+
+# kinematics
+loadrt trivkins
+loadrt tp
+
+# motion controller, get name and thread periods from ini file
+loadrt [EMCMOT]EMCMOT servo_period_nsec=[EMCMOT]SERVO_PERIOD num_joints=[TRAJ]AXES tp=tp kins=trivkins
+loadrt hal_bb_gpio output_pins=807,926,928,911,916,915,923 input_pins=814,808,930
+loadrt [PRUCONF](DRIVER) prucode=/usr/lib/linuxcnc/xenomai/pru_generic.bin [PRUCONF](CONFIG)
+
+loadrt hal_arm335xQEP encoders="eQEP0"
+
+loadrt abs      names=abs-speed
+loadrt scale    names=spindle-rps2rpm,spindle-scale
+loadrt lowpass  names=spindle-rpm-filter
+loadrt near     names=spindle-at-speed-detect
+loadrt pid	names=spindle-pid
+loadrt sum2	names=spindle-sum
+loadrt limit2	names=spindle-ramp
+loadrt timedelay names=spindle-inhibit,spindle-reverse
+
+
+# ################################################
+# THREADS
+# ################################################
+
+addf [PRUCONF](DRIVER).capture-position     servo-thread
+addf eqep.update                            servo-thread
+addf bb_gpio.read                           servo-thread
+addf motion-command-handler                 servo-thread
+addf motion-controller                      servo-thread
+addf [PRUCONF](DRIVER).update               servo-thread
+addf bb_gpio.write                          servo-thread
+
+addf abs-speed                              servo-thread
+addf spindle-rps2rpm                        servo-thread
+addf spindle-rpm-filter                     servo-thread
+addf spindle-at-speed-detect                servo-thread
+addf spindle-pid.do-pid-calcs               servo-thread
+addf spindle-sum		            servo-thread
+addf spindle-ramp		            servo-thread
+addf spindle-inhibit		            servo-thread
+addf spindle-reverse		            servo-thread
+
+
+# ######################################################
+# Axis-of-motion Specific Configs (not the GUI)
+# ######################################################
+
+# ################
+# Spindle
+# ################
+
+# Reverse motor polarity
+# Delay to keep reverse relay switched whilst spindle stops, overwise we will
+# send a reverse polarity voltage to the drive
+setp spindle-reverse.on-delay  0.00
+setp spindle-reverse.off-delay  1.0
+net spindle-rev motion.spindle-reverse => spindle-reverse.in
+net reverse-delay spindle-reverse.out  => bb_gpio.p9.out-11
+
+
+# Enable spindle
+net spindle-enable motion.spindle-on => spindle-pid.enable 
+net spindle-enable => bb_gpio.p9.out-16
+
+# hold the spindle inhibit closed for a bit to give the drive a chance stablise
+setp spindle-inhibit.on-delay  0.75
+setp spindle-inhibit.off-delay  0.0
+net spindle-enable => spindle-inhibit.in
+net spindle-delay spindle-inhibit.out => bb_gpio.p9.out-23
+
+# Set spindle max rate of change (units per second)
+#setp spindle-ramp.maxv 60
+#setp spindle-ramp.maxv 40 # 31/5
+setp spindle-ramp.maxv 250
+# And intercept spindle speed out
+net spindle-cmd <= motion.spindle-speed-out => spindle-ramp.in
+net spindle-ramped <= spindle-ramp.out
+ 
+# Setup PWM
+setp hal_pru_generic.pwmgen.00.pwm_period       10000000
+setp hal_pru_generic.pwmgen.00.out.00.scale 	1500
+setp hal_pru_generic.pwmgen.00.out.00.pin       917
+setp hal_pru_generic.pwmgen.00.out.00.enable    1 
+setp hal_pru_generic.pwmgen.00.out.00.value     0.0
+
+# PID Tunables
+setp spindle-pid.Pgain 		0
+setp spindle-pid.Igain 		0.5
+setp spindle-pid.Dgain 		0
+setp spindle-pid.FF0		0.5
+setp spindle-pid.deadband	0.01
+setp spindle-pid.maxoutput	0
+
+# Scale RPS to RPM
+setp spindle-rps2rpm.gain 60
+
+# Filter RPM for the display
+setp spindle-rpm-filter.gain 0.01
+
+
+# Setup encoder (30 slot quad = 120)
+setp eQEP0.position-scale 120
+net spindle_rev_count    eQEP0.position     =>  motion.spindle-revs 
+net spindle_raw_velocity eQEP0.velocity     =>  spindle-rps2rpm.in 
+net spindle_index_enable eQEP0.index-enable <=> motion.spindle-index-enable
+
+# Connect PID
+net pid_feedback	spindle-pid.feedback <= motion.spindle-speed-in <= spindle-rps2rpm.out
+net spindle-ramped => spindle-pid.command => spindle-sum.in0
+net pid_output		spindle-pid.output   => spindle-sum.in1
+
+net pwmgen_value	hal_pru_generic.pwmgen.00.out.00.value <= spindle-sum.out	
+
+
+# Spindle at speed 
+setp spindle-at-speed-detect.scale 1.01
+net spindle-cmd => spindle-at-speed-detect.in1
+net spindle-ramped => spindle-at-speed-detect.in2
+net spindle-ready <= spindle-at-speed-detect.out => motion.spindle-at-speed
+
+# For display in pyvcp
+net pid_feedback => spindle-rpm-filter.in
+net smoothed_rpm spindle-rpm-filter.out
+
+# ################
+# X [0] Axis
+# ################
+
+# axis enable chain
+newsig emcmot.00.enable bit
+sets emcmot.00.enable FALSE
+
+net emcmot.00.enable <= axis.0.amp-enable-out 
+net emcmot.00.enable => [PRUCONF](DRIVER).stepgen.00.enable
+
+
+# position command and feedback
+net emcmot.00.pos-cmd <= axis.0.motor-pos-cmd
+net emcmot.00.pos-cmd => [PRUCONF](DRIVER).stepgen.00.position-cmd
+
+net motor.00.pos-fb <= [PRUCONF](DRIVER).stepgen.00.position-fb
+net motor.00.pos-fb => axis.0.motor-pos-fb
+
+net x-home bb_gpio.p8.in-08 => axis.0.home-sw-in
+
+# timing parameters
+setp [PRUCONF](DRIVER).stepgen.00.dirsetup        200
+setp [PRUCONF](DRIVER).stepgen.00.dirhold         200
+
+setp [PRUCONF](DRIVER).stepgen.00.steplen         3000
+setp [PRUCONF](DRIVER).stepgen.00.stepspace       3000
+
+setp [PRUCONF](DRIVER).stepgen.00.position-scale  [AXIS_0]SCALE
+
+setp [PRUCONF](DRIVER).stepgen.00.maxvel          [AXIS_0]STEPGEN_MAX_VEL
+setp [PRUCONF](DRIVER).stepgen.00.maxaccel        [AXIS_0]STEPGEN_MAX_ACC
+
+setp [PRUCONF](DRIVER).stepgen.00.steppin         914
+setp [PRUCONF](DRIVER).stepgen.00.dirpin          924
+
+
+
+# ################
+# Z [2] Axis
+# ################
+
+# axis enable chain
+newsig emcmot.01.enable bit
+sets emcmot.01.enable FALSE
+
+net emcmot.01.enable <= axis.2.amp-enable-out 
+net emcmot.01.enable => [PRUCONF](DRIVER).stepgen.01.enable
+
+
+# position command and feedback
+net emcmot.01.pos-cmd <= axis.2.motor-pos-cmd
+net emcmot.01.pos-cmd => [PRUCONF](DRIVER).stepgen.01.position-cmd
+
+net motor.01.pos-fb <= [PRUCONF](DRIVER).stepgen.01.position-fb
+net motor.01.pos-fb => axis.2.motor-pos-fb
+
+
+# timing parameters
+setp [PRUCONF](DRIVER).stepgen.01.dirsetup        200
+setp [PRUCONF](DRIVER).stepgen.01.dirhold         200
+
+setp [PRUCONF](DRIVER).stepgen.01.steplen         3000
+setp [PRUCONF](DRIVER).stepgen.01.stepspace       3000
+
+setp [PRUCONF](DRIVER).stepgen.01.position-scale  [AXIS_2]SCALE
+
+setp [PRUCONF](DRIVER).stepgen.01.maxvel          [AXIS_2]STEPGEN_MAX_VEL
+setp [PRUCONF](DRIVER).stepgen.01.maxaccel        [AXIS_2]STEPGEN_MAX_ACC
+
+setp [PRUCONF](DRIVER).stepgen.01.steppin         819
+setp [PRUCONF](DRIVER).stepgen.01.dirpin          813
+
+
+net z-home bb_gpio.p8.in-14 => axis.2.home-sw-in
+# ##################################################
+# Standard I/O - EStop, Enables, Limit Switches, Etc
+# ##################################################
+
+# create a signal for the estop loopback
+net estop-loop bb_gpio.p9.in-30 => iocontrol.0.emc-enable-in
+
+# create signals for tool loading loopback
+net tool-prep-loop iocontrol.0.tool-prepare => iocontrol.0.tool-prepared
+net tool-change-loop iocontrol.0.tool-change => iocontrol.0.tool-changed
+
+# Axis enable signals
+net emcmot.00.enable => bb_gpio.p9.out-26
+setp bb_gpio.p9.out-26.invert 0
+
+setp bb_gpio.p9.out-28.invert 1 # E-stop out - loops thru switches to P9.30
+setp bb_gpio.p8.out-07.invert 1 # Machine power
+
+
+

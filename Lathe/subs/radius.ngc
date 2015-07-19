@@ -1,0 +1,38 @@
+o<radius> sub
+#<x_dia> = #1 (=20 Diameter)
+#<rad> = #2 (=2.0 Radius)
+#<z_start> = #3 (=0.000 Z Start)
+#<doc> = #4 (=.125 DOC)
+#<feed> = #5 (=5 Feed)
+#<tool> = #6 (=1 Tool)
+#<sfm> = #7 (=30 SMM)
+#<rpm> = #8 (=500 RPM)
+#<coolant> = #9 (=8 Coolant)
+
+#<z_step> = #<doc>
+#<x_step> = [#<x_dia> - [#<doc> * 2]]
+
+G7 G18 G40 F#<feed>
+G21
+G96 D#<rpm> S#<sfm>
+T#<tool> M6 G43
+M3 M#<coolant>
+
+G0 X[#<x_dia> + 0.200] Z[#<z_start>]
+G41
+o100 while [#<rad> GT #<z_step>]
+G0 Z[#<z_start> + 0.100]
+G0 X[#<x_dia> + 0.200]
+G0 Z[#<z_start> - #<z_step>]
+G1 X#<x_dia>
+G2 X#<x_step> Z#<z_start> I-#<z_step> K0.0
+#<x_step> = [#<x_step> - [#<doc> * 2]]
+#<z_step> = [#<z_step> + #<doc>]
+o100 endwhile
+
+G40
+G0 Z[#<z_start> + 0.100]
+X[#<x_dia> + 0.200]
+M5 M9
+;G53 G0 X0 Z0
+o<radius> endsub

@@ -1,0 +1,13 @@
+net smoothed_rpm    => pyvcp.spindle-speed
+#net spindle_raw_velocity => pyvcp.spindle-speed
+
+net spindle-ready       => pyvcp.spindle-at-speed
+
+
+#
+net sxp.x-button => pyvcp.x_led1
+net sxp.z-button => pyvcp.z_led3
+net sxp.select-jog-increment-0 => pyvcp.Increment_led1
+net sxp.select-jog-increment-1 => pyvcp.Increment_led2
+net sxp.select-jog-increment-2 => pyvcp.Increment_led3
+net sxp.select-jog-increment-3 => pyvcp.Increment_led4

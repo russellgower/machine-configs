@@ -1,0 +1,58 @@
+(info: Facing)
+; TOUCH OFF Z zero FIRST
+; variable 5410 is the current tool tip diameter so make sure
+; your tool table is set correctly...
+
+o<face>sub
+#<stock-diameter> = #1 (=50.0 Stock Diameter)
+#<finish-diameter> = #2 (=5.0 Small Diameter)
+#<cut-depth> = #3 (=0.200 Cut Depth)
+#<start-z> = #4 (=0.000 Start Z)
+#<end-z> = #5 (=-0.020 End Z)
+#<sfm> = #6 (=80 SFM)
+#<tool> = #7 (=1 Tool)
+#<max-rpm> = #8 (=500 Max RPM)
+#<feed-rate> = #9 (=50 Feed mm/Min)
+#<coolant>= #10 (=8 Coolant 8 On 9 Off)
+#<setZzero>= #11 (=0 Set Z0 0=No 1=Yes)
+
+; SETUP TOOL
+G21
+G18
+T#<tool> M6
+G43 
+G7 G96 D#<max-rpm> S#<sfm>
+
+M3 M#<coolant>
+
+F#<feed-rate>
+#<inital-z> = [#<start-z>+0.50]
+G0 X[#<stock-diameter>+0.50] Z[#<inital-z>]
+
+#<current-z> = #<start-z>
+#<target-x> = [#<finish-diameter> - [#5410*3]]
+
+o100 while[#<current-z> gt #<end-z>]
+ o101 if[#<current-z>-#<cut-depth> gt #<end-z>]
+  #<current-z> = [#<current-z>-#<cut-depth>]
+ o101 else
+  #<current-z> = #<end-z>
+ o101 endif
+Z[#<current-z>]
+G1 x#<target-x>
+Z[#<current-z>+#5410+#5410]
+G0 X[#<stock-diameter>+0.5]
+o100 endwhile
+
+M5 M9
+
+; set Z zero to end of stock
+o110 if [#<setZzero> EQ 1]
+  G0 Z[#<current-z>]
+  G10 L20 P1 Z0.000
+  G4P1.0
+  (MSG,Z Zero Set To Face)
+o110 endif
+;G53 G0 X0 Z0
+G97
+o<face>endsub

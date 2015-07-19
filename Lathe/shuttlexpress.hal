@@ -1,0 +1,301 @@
+
+#
+# This HAL file hooks up a ShuttleXpress USB dongle from Contour Design.
+#
+# The ShuttleXpress has five momentary buttons, a cheesy jog-wheel with 10
+# counts per revolution and detents, and a 15-position rotary knob with
+# return-to-center springy action.
+#
+
+loadusr -W shuttlexpress /dev/hidraw2
+
+loadrt abs_s32 names=abs_s32.sxp
+loadrt select8 names=select8.sxp-jog-speed,select8.sxp-jog-increment
+loadrt mux2 names=mux2.sxp-x-analog,mux2.sxp-y-analog,mux2.sxp-z-analog,mux2.sxp-a-analog
+loadrt updown names=updown.sxp
+loadrt and2 names=and2.sxp-x-pos,and2.sxp-x-neg,and2.sxp-y-pos,and2.sxp-y-neg,and2.sxp-z-pos,and2.sxp-z-neg,and2.sxp-a-pos,and2.sxp-a-neg
+loadrt tristate_float names=tristate-float.sxp0,tristate-float.sxp1,tristate-float.sxp2,tristate-float.sxp3,tristate-float.sxp4,tristate-float.sxp5,tristate-float.sxp6,tristate-float.sxp7,tristate-float.sxp-jog-increment-0,tristate-float.sxp-jog-increment-1,tristate-float.sxp-jog-increment-2,tristate-float.sxp-jog-increment-3
+loadrt ilowpass names=ilowpass.sxp,ilowpass.sxp.lathex
+
+
+#
+# make nets from the shuttlexpress buttons and wheels
+#
+#changes added by Karl to make buttons xyz toggle and reset each other
+loadrt flipflop count=3
+loadrt not count=3
+loadrt or2 count=3
+loadrt oneshot count=3
+
+addf oneshot.0 servo-thread
+addf oneshot.1 servo-thread
+addf oneshot.2 servo-thread
+setp oneshot.0.width 0.001
+setp oneshot.1.width 0.001
+setp oneshot.2.width 0.001
+
+addf flipflop.0 servo-thread
+addf flipflop.1 servo-thread
+addf flipflop.2 servo-thread
+
+addf not.0 servo-thread
+addf not.1 servo-thread
+addf not.2 servo-thread
+addf or2.0 servo-thread
+addf or2.1 servo-thread
+addf or2.2 servo-thread
+#Karl: swap z and x 0,2
+net sxp.y-buttonpush     <= shuttlexpress.0.button-2 flipflop.0.clk 
+net sxp.x-buttonpush     <= shuttlexpress.0.button-1 flipflop.1.clk
+net sxp.z-buttonpush     <= shuttlexpress.0.button-0 flipflop.2.clk
+
+net sxp.a-button     <= shuttlexpress.0.button-3
+net sxp.step-button  <= shuttlexpress.0.button-4
+net sxp.counts       <= shuttlexpress.0.counts
+net sxp.spring-wheel <= shuttlexpress.0.spring-wheel-s32
+
+net sxp.x-button <= flipflop.0.out 
+net sxp.x-button not.0.in
+net datax not.0.out => flipflop.0.data 
+net sxp.y-button => or2.0.in0
+net sxp.z-button => or2.0.in1
+net resetx <= or2.0.out
+net resetx => oneshot.0.in
+net resetx_pulse oneshot.0.out
+net resetx_pulse => flipflop.0.reset
+
+
+net sxp.y-button <= flipflop.1.out
+net sxp.y-button not.1.in
+net datay not.1.out => flipflop.1.data
+net sxp.x-button => or2.1.in0
+net sxp.z-button => or2.1.in1
+net resety <= or2.1.out
+net resety => oneshot.1.in
+net resety_pulse oneshot.1.out
+net resety_pulse => flipflop.1.reset
+
+net sxp.z-button <= flipflop.2.out
+net sxp.z-button not.2.in
+net dataz not.2.out => flipflop.2.data
+net sxp.x-button => or2.2.in0
+net sxp.y-button => or2.2.in1
+net resetz <= or2.2.out
+net resetz => oneshot.2.in
+net resetz_pulse oneshot.2.out
+net resetz_pulse => flipflop.2.reset
+
+
+
+#
+# pushing an axis-button and turning the spring-wheel gives continuous
+
+# jogging in the selected axis, with speed proportional to spring-wheel
+# deflection
+#
+
+addf abs_s32.sxp servo-thread
+
+addf select8.sxp-jog-speed servo-thread
+
+addf tristate-float.sxp0 servo-thread
+addf tristate-float.sxp1 servo-thread
+addf tristate-float.sxp2 servo-thread
+addf tristate-float.sxp3 servo-thread
+addf tristate-float.sxp4 servo-thread
+addf tristate-float.sxp5 servo-thread
+addf tristate-float.sxp6 servo-thread
+addf tristate-float.sxp7 servo-thread
+
+
+# get abs value & sign of spring-wheel
+net sxp.spring-wheel             => abs_s32.sxp.in
+net sxp.spring-wheel-abs         <= abs_s32.sxp.out
+net sxp.spring-wheel-is-positive <= abs_s32.sxp.is-positive
+net sxp.spring-wheel-is-negative <= abs_s32.sxp.is-negative
+
+# use abs value to select abs jog speed
+net sxp.spring-wheel-abs => select8.sxp-jog-speed.sel 
+net sxp.select-jog-speed-0 <= select8.sxp-jog-speed.out0
+net sxp.select-jog-speed-1 <= select8.sxp-jog-speed.out1
+net sxp.select-jog-speed-2 <= select8.sxp-jog-speed.out2
+net sxp.select-jog-speed-3 <= select8.sxp-jog-speed.out3
+net sxp.select-jog-speed-4 <= select8.sxp-jog-speed.out4
+net sxp.select-jog-speed-5 <= select8.sxp-jog-speed.out5
+net sxp.select-jog-speed-6 <= select8.sxp-jog-speed.out6
+net sxp.select-jog-speed-7 <= select8.sxp-jog-speed.out7
+
+# each of the 8 speed selector bits turns on a tristate float
+net sxp.select-jog-speed-0 => tristate-float.sxp0.enable
+net sxp.select-jog-speed-1 => tristate-float.sxp1.enable
+net sxp.select-jog-speed-2 => tristate-float.sxp2.enable
+net sxp.select-jog-speed-3 => tristate-float.sxp3.enable
+net sxp.select-jog-speed-4 => tristate-float.sxp4.enable
+net sxp.select-jog-speed-5 => tristate-float.sxp5.enable
+net sxp.select-jog-speed-6 => tristate-float.sxp6.enable
+net sxp.select-jog-speed-7 => tristate-float.sxp7.enable
+
+# each of the 8 tristate floats has a constant jog speed on it
+# speeds are specified as "fraction of machine max speed"
+setp tristate-float.sxp0.in    0.0
+setp tristate-float.sxp1.in    0.5
+setp tristate-float.sxp2.in    1.0
+setp tristate-float.sxp3.in    5.0
+setp tristate-float.sxp4.in   10.0
+setp tristate-float.sxp5.in   20.0
+setp tristate-float.sxp6.in  150.0
+setp tristate-float.sxp7.in  240.0
+
+# all of the 8 tristate floats are connected together, one of them drives
+# the net
+net sxp.abs-jog-speed <= tristate-float.sxp0.out
+net sxp.abs-jog-speed <= tristate-float.sxp1.out
+net sxp.abs-jog-speed <= tristate-float.sxp2.out
+net sxp.abs-jog-speed <= tristate-float.sxp3.out
+net sxp.abs-jog-speed <= tristate-float.sxp4.out
+net sxp.abs-jog-speed <= tristate-float.sxp5.out
+net sxp.abs-jog-speed <= tristate-float.sxp6.out
+net sxp.abs-jog-speed <= tristate-float.sxp7.out
+
+net sxp.abs-jog-speed => halui.jog-speed
+
+# while an axis button is depressed, jog the axis continuously in the
+# direction indicated by the spring-wheel
+addf and2.sxp-x-pos servo-thread
+addf and2.sxp-x-neg servo-thread
+addf and2.sxp-y-pos servo-thread
+addf and2.sxp-y-neg servo-thread
+addf and2.sxp-z-pos servo-thread
+addf and2.sxp-z-neg servo-thread
+addf and2.sxp-a-pos servo-thread
+addf and2.sxp-a-neg servo-thread
+
+net sxp.x-button                     => and2.sxp-x-pos.in0
+net sxp.spring-wheel-is-positive     => and2.sxp-x-pos.in1
+#net sxp.jog-x-pos and2.sxp-x-pos.out => halui.jog.0.plus
+#revert x axis Karl
+net sxp.jog-x-pos and2.sxp-x-pos.out => halui.jog.0.minus
+
+net sxp.x-button                     => and2.sxp-x-neg.in0
+net sxp.spring-wheel-is-negative     => and2.sxp-x-neg.in1
+#net sxp.jog-x-neg and2.sxp-x-neg.out => halui.jog.0.minus
+net sxp.jog-x-neg and2.sxp-x-neg.out => halui.jog.0.plus
+
+net sxp.y-button                     => and2.sxp-y-pos.in0
+net sxp.spring-wheel-is-positive     => and2.sxp-y-pos.in1
+net sxp.jog-y-pos and2.sxp-y-pos.out => halui.jog.1.plus
+
+net sxp.y-button                     => and2.sxp-y-neg.in0
+net sxp.spring-wheel-is-negative     => and2.sxp-y-neg.in1
+net sxp.jog-y-neg and2.sxp-y-neg.out => halui.jog.1.minus
+
+net sxp.z-button                     => and2.sxp-z-pos.in0
+net sxp.spring-wheel-is-positive     => and2.sxp-z-pos.in1
+net sxp.jog-z-pos and2.sxp-z-pos.out => halui.jog.2.plus
+
+net sxp.z-button                     => and2.sxp-z-neg.in0
+net sxp.spring-wheel-is-negative     => and2.sxp-z-neg.in1
+net sxp.jog-z-neg and2.sxp-z-neg.out => halui.jog.2.minus
+
+net sxp.a-button                     => and2.sxp-a-pos.in0
+net sxp.spring-wheel-is-positive     => and2.sxp-a-pos.in1
+net sxp.jog-a-pos and2.sxp-a-pos.out => halui.jog.3.plus
+
+net sxp.a-button                     => and2.sxp-a-neg.in0
+net sxp.spring-wheel-is-negative     => and2.sxp-a-neg.in1
+net sxp.jog-a-neg and2.sxp-a-neg.out => halui.jog.3.minus
+
+
+#
+# the "step" button cycles among several jog increments for the jog-wheel
+#
+
+addf updown.sxp servo-thread
+addf tristate-float.sxp-jog-increment-0 servo-thread
+addf tristate-float.sxp-jog-increment-1 servo-thread
+addf tristate-float.sxp-jog-increment-2 servo-thread
+addf tristate-float.sxp-jog-increment-3 servo-thread
+
+# for each click of the jog-wheel there's 1000 simulated counts coming out
+# of the ilowpass below, so these numbers are 1000x smaller than the jog
+# increment size they encode
+setp tristate-float.sxp-jog-increment-0.in    0.00001
+setp tristate-float.sxp-jog-increment-1.in    0.00005
+setp tristate-float.sxp-jog-increment-2.in    0.0001
+setp tristate-float.sxp-jog-increment-3.in    0.001
+
+setp updown.sxp.wrap 1
+setp updown.sxp.min  0
+setp updown.sxp.max  3
+
+net sxp.step-button => updown.sxp.countup
+
+net sxp.jog-increment-selected <= updown.sxp.count
+
+# use the updown count to select jog increment
+addf select8.sxp-jog-increment servo-thread
+net sxp.jog-increment-selected => select8.sxp-jog-increment.sel 
+
+net sxp.select-jog-increment-0 <= select8.sxp-jog-increment.out0
+net sxp.select-jog-increment-0 => tristate-float.sxp-jog-increment-0.enable
+
+net sxp.select-jog-increment-1 <= select8.sxp-jog-increment.out1
+net sxp.select-jog-increment-1 => tristate-float.sxp-jog-increment-1.enable
+
+net sxp.select-jog-increment-2 <= select8.sxp-jog-increment.out2
+net sxp.select-jog-increment-2 => tristate-float.sxp-jog-increment-2.enable
+
+net sxp.select-jog-increment-3 <= select8.sxp-jog-increment.out3
+net sxp.select-jog-increment-3 => tristate-float.sxp-jog-increment-3.enable
+
+# all of the tristate floats are connected together, one of them drives
+# the net
+net sxp.jog-increment <= tristate-float.sxp-jog-increment-0.out
+net sxp.jog-increment <= tristate-float.sxp-jog-increment-1.out
+net sxp.jog-increment <= tristate-float.sxp-jog-increment-2.out
+net sxp.jog-increment <= tristate-float.sxp-jog-increment-3.out
+
+net sxp.jog-increment => axis.0.jog-scale
+net sxp.jog-increment => axis.1.jog-scale
+net sxp.jog-increment => axis.2.jog-scale
+net sxp.jog-increment => axis.3.jog-scale
+
+
+
+
+#
+# pushing an axis-button and turning the jog-wheel gives incremental
+# jogging
+#
+
+# hook up the axis buttons to the axis jog-enable pins
+net sxp.x-button axis.0.jog-enable
+#net sxp.y-button axis.1.jog-enable
+net sxp.z-button axis.2.jog-enable
+#net sxp.a-button axis.3.jog-enable
+
+# The ShuttleXpress jog wheel has 10 clicks per revolution
+# 
+# Low-pass filter the jogwheel, and scale it so one click is 1000 counts
+# coming out of the ilowpass.
+#
+# Then connect it to the jog input on all the axes.
+
+addf ilowpass.sxp servo-thread
+addf ilowpass.sxp.lathex servo-thread
+setp ilowpass.sxp.gain .02
+setp ilowpass.sxp.lathex.gain 0.02
+setp ilowpass.sxp.scale 1000
+setp ilowpass.sxp.lathex.scale -500
+#for lathe diameter mode
+
+net sxp.counts => ilowpass.sxp.in
+net sxp.counts => ilowpass.sxp.lathex.in
+net sxp.counts-smoothed <= ilowpass.sxp.out
+net sxp.counts-smoothed.lathex <= ilowpass.sxp.lathex.out
+#net sxp.counts-smoothed => axis.0.jog-counts
+net sxp.counts-smoothed.lathex => axis.0.jog-counts
+net sxp.counts-smoothed => axis.1.jog-counts
+net sxp.counts-smoothed => axis.2.jog-counts
+net sxp.counts-smoothed => axis.3.jog-counts
+

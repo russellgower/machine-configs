@@ -1,0 +1,93 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<pyvcp>
+         <vbox>       
+         <bd>6</bd>
+                <label>
+                        <text>"Spindle Speed:"</text>
+                        <font>("Helvetica",12)</font>
+                </label>
+                <bar>
+                        <halpin>"spindle-speed"</halpin>
+                        <max_>2500</max_>
+                </bar>
+                <hbox>
+                    <label>
+                        <text>"Spindle-At-Speed:"</text>
+                        <font>("Helvetica",12)</font>
+                    </label>
+                    <led>
+                        <halpin>"spindle-at-speed"</halpin> 
+                        <size>17</size> 
+                        <on_color>"red"</on_color>
+                        <off_color>"red4"</off_color>
+                    </led>
+                </hbox>
+
+                <hbox>
+                    <label>
+                            <text>"X:"</text>
+                            <font>("Helvetica",12)</font>
+                    </label>
+                    <led>
+                        <halpin>"x_led1"</halpin> 
+                        <size>17</size> 
+                        <on_color>"red"</on_color>
+                        <off_color>"red4"</off_color>
+                    </led>
+                    <label>
+                            <text>"     Z:"</text>
+                            <font>("Helvetica",12)</font>
+                    </label>
+                    <led>
+                        <halpin>"z_led3"</halpin> 
+                        <size>17</size> 
+                        <on_color>"red"</on_color>
+                        <off_color>"red4"</off_color>
+                    </led>
+                </hbox>
+                <hbox>
+                    <label>
+                            <text>"0.01:"</text>
+                            <font>("Helvetica",12)</font>
+                    </label>
+                    <led>
+                        <halpin>"Increment_led1"</halpin> 
+                        <size>17</size> 
+                        <on_color>"red"</on_color>
+                        <off_color>"red4"</off_color>
+                    </led>
+                    <label>
+                            <text>" 0.05:"</text>
+                            <font>("Helvetica",12)</font>
+                    </label>
+                    <led>
+                        <halpin>"Increment_led2"</halpin> 
+                        <size>17</size> 
+                        <on_color>"red"</on_color>
+                        <off_color>"red4"</off_color>
+                    </led>
+                    <label>
+                            <text>" 0.1:"</text>
+                            <font>("Helvetica",12)</font>
+                    </label>
+                    <led>
+                        <halpin>"Increment_led3"</halpin> 
+                        <size>17</size> 
+                        <on_color>"red"</on_color>
+                        <off_color>"red4"</off_color>
+                    </led>
+                    <label>
+                            <text>" 1.0:"</text>
+                            <font>("Helvetica",12)</font>
+                    </label>
+                    <led>
+                        <halpin>"Increment_led4"</halpin> 
+                        <size>17</size> 
+                        <on_color>"red"</on_color>
+                        <off_color>"red4"</off_color>
+                    </led>
+
+                </hbox>
+
+        </vbox>
+</pyvcp>

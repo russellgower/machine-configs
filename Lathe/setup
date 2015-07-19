@@ -1,0 +1,28 @@
+#!/bin/bash
+#echo cape-universaln > /sys/devices/bone_capemgr.*/slots 2>/dev/null
+config-pin overlay cape-universal
+#config-pin overlay cape-univ-audio
+config-pin p9.27 qep
+config-pin p9.42 in
+config-pin p9.41 in
+config-pin p9.91 qep
+config-pin p9.92 qep
+
+config-pin p9.14 out
+config-pin p9.24 out
+config-pin p8.19 out
+config-pin p8.13 out
+config-pin p8.11 out
+config-pin p9.28 out
+config-pin p9.26 out
+#config-pin p8.16 out
+config-pin p8.07 out
+config-pin p8.14 in
+config-pin p8.08 in
+config-pin p9.30 in
+config-pin p9.17 out
+config-pin p9.11 out
+config-pin p9.16 out
+config-pin p9.15 out
+
+
